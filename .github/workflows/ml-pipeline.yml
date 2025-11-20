@@ -1,0 +1,128 @@
+name: ML Pipeline
+
+on:
+  pull_request:          # Коротка перевірка моделі при кожному PR
+  push:
+    branches: [ master ] # Автоматичний деплой після push у master
+  workflow_dispatch:      # Ручний запуск
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/speech-model
+  TRAIN_LOG: train.log
+  METRICS_FILE: metrics.json
+
+jobs:
+  # ============================
+  # 1. TRAIN MODEL
+  # ============================
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # Кеш pip щоб прискорити інсталяцію
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Build trainer image
+        run: |
+          docker build \
+            --target trainer \
+            -t trainer-image \
+            .
+
+      - name: Run training container
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            trainer-image \
+            bash -c "python train.py --save-model model.pth --epochs 2 --download-data 2>&1 | tee $TRAIN_LOG"
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: trained-model
+          path: model.pth
+
+      - name: Upload training log
+        uses: actions/upload-artifact@v3
+        with:
+          name: training-log
+          path: ${{ env.TRAIN_LOG }}
+
+  # ============================
+  # 2. TEST MODEL AFTER TRAINING
+  # ============================
+  test-model:
+    runs-on: ubuntu-latest
+    needs: train
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-model
+
+      - name: Install dependencies
+        run: |
+          pip install torch torchaudio fastapi uvicorn numpy python-multipart
+
+      - name: Run inference test
+        run: |
+          python test_inference.py --model model.pth --output $METRICS_FILE
+
+      - name: Upload metrics
+        uses: actions/upload-artifact@v3
+        with:
+          name: model-metrics
+          path: ${{ env.METRICS_FILE }}
+
+  # ============================
+  # 3. BUILD & PUSH INFERENCE IMAGE
+  # ============================
+  build-runtime:
+    runs-on: ubuntu-latest
+    needs: test-model
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-model
+
+      - name: Login to GHCR
+        run: echo $CR_PAT | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+        env:
+          CR_PAT: ${{ secrets.CR_PAT }}
+
+      - name: Build runtime image
+        run: |
+          docker build \
+            --target runtime \
+            -t $IMAGE_NAME:latest \
+            .
+
+      - name: Push runtime image
+        run: |
+          docker push $IMAGE_NAME:latest
+
+      - name: Save runtime image to file
+        run: docker save $IMAGE_NAME:latest -o runtime.tar
+
+      - name: Upload runtime image tar
+        uses: actions/upload-artifact@v3
+        with:
+          name: runtime-image-tar
+          path: runtime.tar
