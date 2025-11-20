@@ -42,13 +42,13 @@ jobs:
             bash -c "python train.py --save-model model.pth --epochs 2 --download-data 2>&1 | tee $TRAIN_LOG"
 
       - name: Upload model artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: trained-model
           path: model.pth
 
       - name: Upload training log
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: training-log
           path: ${{ env.TRAIN_LOG }}
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Download model artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: trained-model
 
@@ -77,7 +77,7 @@ jobs:
           python test_inference.py --model model.pth --output $METRICS_FILE
 
       - name: Upload metrics
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: model-metrics
           path: ${{ env.METRICS_FILE }}
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Download model artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: trained-model
 
@@ -122,7 +122,7 @@ jobs:
         run: docker save $IMAGE_NAME:latest -o runtime.tar
 
       - name: Upload runtime image tar
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: runtime-image-tar
           path: runtime.tar
