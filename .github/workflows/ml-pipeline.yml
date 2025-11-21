@@ -7,7 +7,7 @@ on:
   workflow_dispatch:      # Ручний запуск
 
 env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}/speech-model
+  IMAGE_NAME: ${{ format('ghcr.io/{0}/{1}/speech-model', github.repository_owner, 'lab3') }}
   TRAIN_LOG: train.log
   METRICS_FILE: metrics.json
 
@@ -126,5 +126,6 @@ jobs:
         with:
           name: runtime-image-tar
           path: runtime.tar
+
 
 
