@@ -61,9 +61,13 @@ jobs:
         with:
           name: trained-model
 
-      - name: Install dependencies
+      - name: Install dependencies (CPU Torch)
         run: |
-          pip install --no-cache-dir torch torchaudio fastapi uvicorn numpy python-multipart
+          pip install --no-cache-dir \
+            torch==2.2.2+cpu \
+            torchaudio==2.2.2+cpu \
+            --index-url https://download.pytorch.org/whl/cpu \
+            fastapi uvicorn numpy python-multipart
 
       - name: Run inference test
         run: |
