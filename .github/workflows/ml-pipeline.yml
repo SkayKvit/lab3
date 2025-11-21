@@ -102,21 +102,19 @@ jobs:
         with:
           name: trained-model
 
+      - name: Normalize repo name (lowercase)
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}/speech-model" >> $GITHUB_ENV
+
       - name: Login to GHCR
         run: echo $CR_PAT | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
         env:
           CR_PAT: ${{ secrets.CR_PAT }}
 
       - name: Build runtime image
-        run: |
-          docker build \
-            --target runtime \
-            -t $IMAGE_NAME:latest \
-            .
+        run: docker build --target runtime -t $IMAGE_NAME:latest .
 
       - name: Push runtime image
-        run: |
-          docker push $IMAGE_NAME:latest
+        run: docker push $IMAGE_NAME:latest
 
       - name: Save runtime image to file
         run: docker save $IMAGE_NAME:latest -o runtime.tar
@@ -126,6 +124,8 @@ jobs:
         with:
           name: runtime-image-tar
           path: runtime.tar
+
+
 
 
 
