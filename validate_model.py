@@ -1,38 +1,65 @@
 # validate_model.py
-import time, json
+import time
+import json
 import torch
 import torchaudio
-from model import MyModel
+import os
+from train import SimpleCNN, SAMPLE_CLASSES, SAMPLE_RATE, N_MELS  # ті ж самі конфіги
 
-def get_sample_input(file_path):
-    waveform, sr = torchaudio.load(file_path)
-    mfcc = torchaudio.transforms.MFCC(sample_rate=sr, n_mfcc=40)(waveform)
-    return mfcc.unsqueeze(0)
+MODEL_PATH = "artifacts/model.pth"
+TEST_DIR = ""  # директорія з тестовими wav-файлами
 
-model = MyModel()
-model.load_state_dict(torch.load("artifacts/model.pth", map_location="cpu"))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = SimpleCNN().to(device)
+model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 model.eval()
 
-test_files = ["yes_1.wav", "down_1.wav"]
-latencies = []
+# MelSpectrogram трансформація (як в app.py)
+mel_transform = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_mels=N_MELS)
 
-for f in test_files:
-    x = get_sample_input(f)
+def process_file(file_path):
+    waveform, sr = torchaudio.load(file_path)
+    if sr != SAMPLE_RATE:
+        resampler = torchaudio.transforms.Resample(sr, SAMPLE_RATE)
+        waveform = resampler(waveform)
+    spec = mel_transform(waveform).squeeze(0)
+    if spec.dim() == 2:
+        spec = spec.unsqueeze(0)  # [1, n_mels, time]
+    return spec.to(device)
+
+# збір усіх wav-файлів з TEST_DIR
+test_files = [os.path.join(TEST_DIR, f) for f in os.listdir(TEST_DIR) if f.endswith(".wav")]
+
+latencies = []
+predictions = []
+
+for file_path in test_files:
+    x = process_file(file_path)
+    # вимірюємо latency 5 разів для стабільності
     for _ in range(5):
         start = time.time()
         with torch.no_grad():
-            _ = model(x)
+            outputs = model(x)
+            probs = torch.softmax(outputs, dim=1).cpu().numpy().tolist()[0]
+            top_idx = int(torch.argmax(outputs))
         end = time.time()
         latencies.append(end - start)
+    predictions.append({
+        "file": os.path.basename(file_path),
+        "predicted": SAMPLE_CLASSES[top_idx],
+        "probabilities": dict(zip(SAMPLE_CLASSES, probs))
+    })
 
 metrics = {
     "avg_latency_sec": sum(latencies)/len(latencies),
     "min_latency_sec": min(latencies),
     "max_latency_sec": max(latencies),
-    "num_samples": len(test_files)
+    "num_samples": len(test_files),
+    "predictions": predictions
 }
 
 with open("metrics.json", "w") as f:
     json.dump(metrics, f, indent=2)
 
-print("Metrics:", metrics)
+print("Metrics saved to metrics.json")
+print(metrics)
