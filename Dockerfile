@@ -48,7 +48,9 @@ COPY --from=trainer /artifacts/model.pth /app/artifacts/model.pth
 
 # Copy inference app
 COPY app.py .
+copy model.py .
 
 EXPOSE 8000
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop", "--workers", "1"]
+
