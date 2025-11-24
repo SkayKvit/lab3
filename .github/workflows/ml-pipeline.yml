@@ -1,4 +1,4 @@
-name: ML Pipeline - Pretrained Model
+name: ML Pipeline
 
 on:
   push:
@@ -43,6 +43,7 @@ jobs:
 
       - name: Run Validation with Pretrained Model
         run: python validate_model.py
+
 
 
 
