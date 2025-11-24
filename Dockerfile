@@ -19,14 +19,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir torch==2.2.2+cpu torchaudio==2.2.2+cpu \
         --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Training code
-COPY train.py .
-
-# Папки для артефактів
-RUN mkdir -p /artifacts /data/speech_commands
-
-# ✅ Не тренуємо під час build
+# Training code (закоментовано)
+# COPY train.py .
+# RUN mkdir -p /artifacts /data/speech_commands
 # RUN python train.py --save-model /artifacts/model.pth --download-data
+
+# Якщо модель вже є в репозиторії, просто копіюємо її до artifacts
+COPY model.pth /artifacts/model.pth
 
 
 # =========================
@@ -51,7 +50,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
         torch==2.2.2+cpu torchaudio==2.2.2+cpu \
         --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Copy trained model from trainer
+# Copy pretrained model from trainer stage
 COPY --from=trainer /artifacts/model.pth /app/artifacts/model.pth
 
 # Copy inference app
