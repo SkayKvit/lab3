@@ -4,7 +4,7 @@ import json
 import torch
 import torchaudio
 import os
-from train import SimpleCNN, SAMPLE_CLASSES, SAMPLE_RATE, N_MELS  # ті ж самі конфіги
+from model import SimpleCNN, SAMPLE_CLASSES, SAMPLE_RATE, N_MELS  # ті ж самі конфіги
 
 MODEL_PATH = "artifacts/model.pth"
 TEST_DIR = ""  # директорія з тестовими wav-файлами
