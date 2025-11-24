@@ -13,7 +13,7 @@ model = MyModel()
 model.load_state_dict(torch.load("artifacts/model.pth", map_location="cpu"))
 model.eval()
 
-test_files = ["tests/yes_1.wav", "tests/down_1.wav"]
+test_files = ["yes_1.wav", "down_1.wav"]
 latencies = []
 
 for f in test_files:
