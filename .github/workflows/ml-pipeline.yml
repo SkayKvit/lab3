@@ -31,7 +31,7 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}/artifacts:/artifacts \
             trainer-image \
-            python train.py --save-model /artifacts/model.pth --epochs 1 --download-data
+            python train.py --save-model /artifacts/model.pth --download-data
 
       - name: Upload trained model
         uses: actions/upload-artifact@v4
@@ -100,5 +100,6 @@ jobs:
 
       - name: Run Validation with Real Test Audio
         run: python validate_model.py
+
 
 
