@@ -5,7 +5,7 @@ FROM python:3.11-slim AS trainer
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system deps (audio libs)
+# Системні залежності для аудіо та збірки
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         ffmpeg \
@@ -16,20 +16,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 
-# Copy and install dependencies
+# Копіюємо requirements і встановлюємо всі пакети разом без кешу
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    pip install torchcodec
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir torch==2.2.2+cpu torchaudio==2.2.2+cpu \
+        --extra-index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir torchcodec
 
-# Copy training code
+# Копіюємо тренувальний код
 COPY train.py .
 
-# Prepare dirs
+# Папки для артефактів та даних
 RUN mkdir -p /artifacts /data/speech_commands
 
-# Train model during build
+# Тренуємо модель під час build
 RUN python train.py --save-model /artifacts/model.pth --download-data
+
 
 # =========================
 # Stage 2: RUNTIME
@@ -38,7 +41,7 @@ FROM python:3.11-slim AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install lightweight audio deps
+# Мінімальні системні залежності
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libsndfile1 \
@@ -46,16 +49,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install runtime dependencies (only the essentials)
+# Копіюємо requirements і встановлюємо тільки потрібне для inference
 COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt && \
-    pip install numpy python-multipart fastapi uvicorn torch torchaudio
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
+        numpy python-multipart fastapi uvicorn \
+        torch==2.2.2+cpu torchaudio==2.2.2+cpu \
+        --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Copy trained model
+# Копіюємо натреновану модель з тренера
 COPY --from=trainer /artifacts/model.pth /app/artifacts/model.pth
 
-# Copy inference app
+# Копіюємо inference app
 COPY app.py .
 COPY train.py .
 
