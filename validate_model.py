@@ -1,65 +1,110 @@
-# validate_model.py
-import time
-import json
-import torch
-import torchaudio
 import os
-from model import SimpleCNN, SAMPLE_CLASSES, SAMPLE_RATE, N_MELS  # ті ж самі конфіги
+import torch
+import soundfile as sf
+import torch.nn.functional as F
+from train import SimpleCNN, SAMPLE_CLASSES, SAMPLE_RATE, N_MELS
+
+device = torch.device("cpu")
 
 MODEL_PATH = "artifacts/model.pth"
-TEST_DIR = os.path.dirname(os.path.abspath(__file__))  # директорія з тестовими wav-файлами
+TEST_DIR = os.path.dirname(__file__)   # шукаємо файли поруч
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Test dir:", TEST_DIR)
+
+
+# -------------------------
+# Load audio WITHOUT torchaudio
+# -------------------------
+def load_audio(path):
+    data, sr = sf.read(path)
+
+    # stereo → mono
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+
+    # ресемплінг при потребі
+    if sr != SAMPLE_RATE:
+        import numpy as np
+        import math
+
+        scale = SAMPLE_RATE / sr
+        new_len = int(len(data) * scale)
+        data = np.interp(
+            np.linspace(0, len(data), new_len),
+            np.arange(len(data)),
+            data
+        )
+        sr = SAMPLE_RATE
+
+    waveform = torch.tensor(data, dtype=torch.float32).unsqueeze(0)
+    return waveform
+
+
+# -------------------------
+# Torch MelSpectrogram (без torchaudio)
+# -------------------------
+class MelSpecTorch(torch.nn.Module):
+    def __init__(self, sample_rate, n_mels):
+        super().__init__()
+        self.mel = torch.nn.functional.melspectrogram
+
+    def forward(self, wav):
+        spec = torch.stft(
+            wav,
+            n_fft=1024,
+            hop_length=256,
+            win_length=1024,
+            return_complex=True,
+        )
+        spec = spec.abs() ** 2
+
+        # Create mel filterbank manually
+        mel_fb = torch.tensor(
+            librosa.filters.mel(
+                sr=SAMPLE_RATE,
+                n_fft=1024,
+                n_mels=N_MELS
+            ),
+            dtype=torch.float32
+        )
+
+        mel_spec = torch.matmul(mel_fb, spec.squeeze(0))
+        mel_spec = torch.log(mel_spec + 1e-9)
+        return mel_spec.unsqueeze(0)
+
+
+# -------------------------
+# Load model
+# -------------------------
+
 model = SimpleCNN().to(device)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 model.eval()
 
-# MelSpectrogram трансформація (як в app.py)
-mel_transform = torchaudio.transforms.MelSpectrogram(sample_rate=SAMPLE_RATE, n_mels=N_MELS)
+mel_extractor = MelSpecTorch(SAMPLE_RATE, N_MELS)
 
-def process_file(file_path):
-    waveform, sr = torchaudio.load(file_path)
-    if sr != SAMPLE_RATE:
-        resampler = torchaudio.transforms.Resample(sr, SAMPLE_RATE)
-        waveform = resampler(waveform)
-    spec = mel_transform(waveform).squeeze(0)
-    if spec.dim() == 2:
-        spec = spec.unsqueeze(0)  # [1, n_mels, time]
-    return spec.to(device)
 
-# збір усіх wav-файлів з TEST_DIR
-test_files = [os.path.join(TEST_DIR, f) for f in os.listdir(TEST_DIR) if f.endswith(".wav")]
+# -------------------------
+# Run prediction
+# -------------------------
 
-latencies = []
-predictions = []
+test_files = [f for f in os.listdir(TEST_DIR) if f.endswith(".wav")]
 
-for file_path in test_files:
-    x = process_file(file_path)
-    # вимірюємо latency 5 разів для стабільності
-    for _ in range(5):
-        start = time.time()
-        with torch.no_grad():
-            outputs = model(x)
-            probs = torch.softmax(outputs, dim=1).cpu().numpy().tolist()[0]
-            top_idx = int(torch.argmax(outputs))
-        end = time.time()
-        latencies.append(end - start)
-    predictions.append({
-        "file": os.path.basename(file_path),
-        "predicted": SAMPLE_CLASSES[top_idx],
-        "probabilities": dict(zip(SAMPLE_CLASSES, probs))
-    })
+if len(test_files) == 0:
+    print("❌ No .wav files found near validate_model.py")
+    exit(1)
 
-metrics = {
-    "avg_latency_sec": sum(latencies)/len(latencies),
-    "min_latency_sec": min(latencies),
-    "max_latency_sec": max(latencies),
-    "num_samples": len(test_files),
-    "predictions": predictions
-}
+print(f"Found {len(test_files)} test wav files\n")
 
-with open("metrics.json", "w") as f:
-    json.dump(metrics, f, indent=2)
+for fname in test_files:
+    path = os.path.join(TEST_DIR, fname)
 
-print("Metrics saved to metrics.json")
-print(metrics)
+    wav = load_audio(path).to(device)
+    mel = mel_extractor(wav)
+    mel = mel.unsqueeze(0)  # batch
+
+    with torch.no_grad():
+        logits = model(mel)
+        pred = torch.argmax(logits, dim=1).item()
+
+    print(f"{fname} → {SAMPLE_CLASSES[pred]}")
