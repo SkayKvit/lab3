@@ -7,7 +7,7 @@ import os
 from model import SimpleCNN, SAMPLE_CLASSES, SAMPLE_RATE, N_MELS  # ті ж самі конфіги
 
 MODEL_PATH = "artifacts/model.pth"
-TEST_DIR = ""  # директорія з тестовими wav-файлами
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))  # директорія з тестовими wav-файлами
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = SimpleCNN().to(device)
