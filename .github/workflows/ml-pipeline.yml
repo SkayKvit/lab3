@@ -91,7 +91,7 @@ jobs:
 
       - name: Run inference script
         run: |
-          python inference.py \
+          python test_inference.py \
             --model artifacts/model.pth \
             --output inference_metrics.json
 
@@ -100,4 +100,5 @@ jobs:
         with:
           name: inference-metrics
           path: inference_metrics.json
+
 
