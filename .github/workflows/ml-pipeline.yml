@@ -2,9 +2,9 @@ name: ML Pipeline
 
 on:
   push:
-    branches: [ master ]
-  pull_request:
-  workflow_dispatch:
+    branches: [ master ]   # повний pipeline
+  pull_request:            # швидке тестування
+  workflow_dispatch:       # ручний запуск
 
 jobs:
   # ------------------------------
@@ -37,6 +37,18 @@ jobs:
           REPO_LOWER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
           docker push ghcr.io/$REPO_LOWER/speech-model:latest
 
+      - name: Save Docker image as tar
+        run: |
+          REPO_LOWER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          mkdir -p artifacts
+          docker save ghcr.io/$REPO_LOWER/speech-model:latest -o artifacts/speech-model.tar
+
+      - name: Upload Docker image tar
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: artifacts/speech-model.tar
+
   # ------------------------------
   # 2. Validate Model & Measure Latency
   # ------------------------------
@@ -52,21 +64,51 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch torchaudio numpy tqdm
 
-      - name: Run Validation with Pretrained Model
+      - name: Check pretrained model exists
         run: |
-          python validate_model.py
+          if [ ! -f artifacts/model.pth ]; then
+            echo "Model not found!"
+            exit 1
+          fi
+
+      - name: Run Validation with Pretrained Model
+        run: python validate_model.py
 
       - name: Upload validation results
         uses: actions/upload-artifact@v4
         with:
           name: validation-results
           path: validation_results.json
+      - name: Save training log
+        run: |
+          mkdir -p artifacts
+          echo "Training log placeholder" > artifacts/train.log
 
-      - name: Upload model as artifact
+      - name: Save report
+        run: |
+          mkdir -p artifacts
+          echo "# Validation Report" > artifacts/report.pdf
+
+
+      - name: Upload trained model
         uses: actions/upload-artifact@v4
         with:
           name: trained-model
           path: artifacts/model.pth
+
+      - name: Upload training log (optional)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: train-log
+          path: artifacts/train.log
+
+      - name: Upload report (optional)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: artifacts/report.pdf
 
   # ------------------------------
   # 3. Inference Test
@@ -88,17 +130,32 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch numpy
+     
+      - name: Check model exists
+        run: ls -l artifacts
+
 
       - name: Run inference script
         run: |
           python test_inference.py \
-            --model artifacts/model.pth \
-            --output inference_metrics.json
+              --model artifacts/model.pth \
+              --output inference_metrics.json
 
       - name: Upload inference metrics
         uses: actions/upload-artifact@v4
         with:
           name: inference-metrics
           path: inference_metrics.json
+
+      - name: Upload all metrics combined (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-metrics
+          path: |
+            validation_results.json
+            inference_metrics.json
+
+
+
 
 
