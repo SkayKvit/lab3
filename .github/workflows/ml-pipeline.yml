@@ -134,7 +134,7 @@ jobs:
       - name: Run inference script
         run: python test_inference.py \
               --model artifacts/model.pth \
-              --output inference_metrics.json
+              --output artifacts/inference_metrics.json
 
       - name: Upload inference metrics
         uses: actions/upload-artifact@v4
@@ -149,5 +149,6 @@ jobs:
           path: |
             validation_results.json
             inference_metrics.json
+
 
 
