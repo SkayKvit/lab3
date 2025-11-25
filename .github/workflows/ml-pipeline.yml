@@ -79,6 +79,16 @@ jobs:
         with:
           name: validation-results
           path: validation_results.json
+      - name: Save training log
+        run: |
+          mkdir -p artifacts
+          echo "Training log placeholder" > artifacts/train.log
+
+      - name: Save report
+        run: |
+          mkdir -p artifacts
+          echo "# Validation Report" > artifacts/report.pdf
+
 
       - name: Upload trained model
         uses: actions/upload-artifact@v4
@@ -139,4 +149,5 @@ jobs:
           path: |
             validation_results.json
             inference_metrics.json
+
 
