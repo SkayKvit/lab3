@@ -106,7 +106,6 @@ for fname in test_files:
 
     wav = load_wav(path).to(device)
     mel = mel_spectrogram(wav)
-    mel = mel.unsqueeze(0)
 
     start = time.time()
     with torch.no_grad():
