@@ -57,13 +57,13 @@ jobs:
           python validate_model.py
 
       - name: Upload validation results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: validation-results
           path: validation_results.json
 
       - name: Upload model as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: trained-model
           path: artifacts/model.pth
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download pretrained model
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: trained-model
           path: artifacts
@@ -96,7 +96,8 @@ jobs:
             --output inference_metrics.json
 
       - name: Upload inference metrics
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: inference-metrics
           path: inference_metrics.json
+
