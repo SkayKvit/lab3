@@ -130,9 +130,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install torch numpy
+     
+      - name: Check model exists
+        run: ls -l artifacts
+
 
       - name: Run inference script
-        run: python test_inference.py \
+        run: |
+          python test_inference.py \
               --model artifacts/model.pth \
               --output artifacts/inference_metrics.json
 
@@ -149,6 +154,7 @@ jobs:
           path: |
             validation_results.json
             inference_metrics.json
+
 
 
 
