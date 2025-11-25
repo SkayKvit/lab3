@@ -38,7 +38,10 @@ jobs:
           docker push ghcr.io/$REPO_LOWER/speech-model:latest
 
       - name: Save Docker image as tar
-        run: docker save ghcr.io/${{ github.repository_owner }}/speech-model:latest -o artifacts/speech-model.tar
+        run: |
+          REPO_LOWER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          mkdir -p artifacts
+          docker save ghcr.io/$REPO_LOWER/speech-model:latest -o artifacts/speech-model.tar
 
       - name: Upload Docker image tar
         uses: actions/upload-artifact@v4
@@ -136,3 +139,4 @@ jobs:
           path: |
             validation_results.json
             inference_metrics.json
+
